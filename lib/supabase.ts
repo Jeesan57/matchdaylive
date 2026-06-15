@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-// Public client — browser-safe, reads only
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Lazy — called at runtime, not at module load / build time
+export function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Supabase env vars not set');
+  return createClient(url, key);
+}
 
 export interface DBStream {
   id?: string;
@@ -18,7 +20,7 @@ export interface DBStream {
 
 /** Load all working streams for a given playlist key */
 export async function loadStreams(playlist: string): Promise<DBStream[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('streams')
     .select('*')
     .eq('playlist', playlist)
