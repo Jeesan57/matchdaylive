@@ -12,8 +12,72 @@ export interface Stream {
 // ─── Raw M3U strings ───────────────────────────────────────────────────────────
 export const PLAYLISTS: Record<PlaylistKey, string> = {
   sports: `#EXTM3U
-
-  `,
+#EXTINF:-1 group-title="Brazil" backups="https://dfr80qz435crc.cloudfront.net/MNOP/Amagi/Caze/Caze_TV_BR/720p-vtt/index.m3u8|https://dfr80qz435crc.cloudfront.net/MNOP/Amagi/Caze/Caze_TV_BR/Caze_TV.m3u8",Caze TV
+https://dfr80qz435crc.cloudfront.net/MNOP/Amagi/Caze/Caze_TV_BR/1080p-vtt/index.m3u8
+#EXTINF:-1 group-title="Brazil" backups="https://video07.logicahost.com.br/rssports02/rssports02/playlist.m3u8|https://video07.logicahost.com.br/rssports03/rssports03/playlist.m3u8|https://video07.logicahost.com.br/rssports04/rssports04/playlist.m3u8",RS Sports 1
+https://video07.logicahost.com.br/rssports01/rssports01/playlist.m3u8
+#EXTINF:-1 group-title="Brazil",RS Sports 5
+https://video03.logicahost.com.br/rssports5/rssports5/playlist.m3u8
+#EXTINF:-1 group-title="Brazil",RS TV
+https://video07.logicahost.com.br/rstv1/rstv1/playlist.m3u8
+#EXTINF:-1 group-title="Sports" backups="https://rmtv.akamaized.net/hls/live/2043154/rmtv-en-web/master.m3u8|https://rmtv.akamaized.net/hls/live/2043153/rmtv-es-web/master.m3u8",REAL MADRID TV ES
+https://rmtv.akamaized.net/hls/live/2043153/rmtv-es-web/bitrate_3.m3u8
+#EXTINF:-1 group-title="Sports" backups="https://bein-esp-xumo.amagi.tv/playlistR720P.m3u8|https://amg01334-beinsportsllc-beinxtraesp-localnow-aekzc.amagi.tv/playlist.m3u8|https://bein-esp-xumo.amagi.tv/playlist.m3u8",BEIN SPORT EXTRA ES
+https://bein-esp-xumo.amagi.tv/playlistR1080p.m3u8
+#EXTINF:-1 group-title="Sports",IDMAN TV TR
+https://str2.yodacdn.net/idman_300_to_small/tracks-v1a1/mono.m3u8
+#EXTINF:-1 group-title="Sports",2TV Sport NO
+https://tv.cdn.xsg.ge/gpb-2tv/index.m3u8
+#EXTINF:-1 group-title="Sports",DAZN COMBAT
+https://dazn-combat-rakuten.amagi.tv/hls/amagi_hls_data_rakutenAA-dazn-combat-rakuten/CDN/master.m3u8
+#EXTINF:-1 group-title="Sports" backups="https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",Red Bull TV
+https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master_3360.m3u8
+#EXTINF:-1 group-title="Sports",NBC Team USA
+https://amg01416-amg01416c4-firetv-us-4522.playouts.now.amagi.tv/playlist.m3u8
+#EXTINF:-1 group-title="Sports",AYM Sports
+https://aym-as.otteravision.com/aym/as/as.m3u8
+#EXTINF:-1 group-title="Sports",BEK Sports West USA
+https://cdn3.wowza.com/5/ZWQ1K2NYTmpFbGsr/BEK-WOWZA-1/smil:BEKPRIMEW.smil/.m3u8
+#EXTINF:-1 group-title="Sports",Garage TV
+https://stream1.sersat.com/hls/garagetv.m3u8
+#EXTINF:-1 group-title="Sports",FIGHT NETWORK
+https://amg00966-amg00966c10-amgplt0201.playout.now3.amagi.tv/playlist/amg00966-amg00966c10-amgplt0201/playlist.m3u8
+#EXTINF:-1 group-title="Sports",FUEL TV
+https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg01074-fueltv-fueltvemeaen-sportstribal/playlist.m3u8
+#EXTINF:-1 group-title="Sports",Horse and Country
+https://hncfree-sportstribal.amagi.tv/hls/amagi_hls_data_sportstri-hncfree-sportstribal/CDN/playlist.m3u8
+#EXTINF:-1 group-title="Sports",MTR Sports-1 GB
+https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg02873-kravemedia-mtrspt1-distrotv/playlist.m3u8
+#EXTINF:-1 group-title="Sports",Sportdigital DE
+https://jmp2.uk/stvp-ATAJ0500433A
+#EXTINF:-1 group-title="Sports",L Equipe FR
+https://jmp2.uk/stvp-FR200016Y5
+#EXTINF:-1 group-title="Sports",SPORT ITALIA IT
+https://amg01370-italiansportcom-sportitalia-rakuten-3hmdb.amagi.tv/amRdirect/ads_pod_type=playerpage_midroll&ads_env=prod&ads_ppid=&ads_rtvid=271861&ads_streaming_id=4f185419-74f6-4564-8ea9-4cdc60746e2f&ads_amagi_channel=781&ads_device_type=web&ads_device_model=&ads_device_year=&ads_player_width=&ads_rtv_content_language=ita&ads_market=it&ads_rtv_content_id=3741&ads_device_make=&ads_user_type=visitor&ads_content_classification=6&ads_gdpr_consent=&ads_device_lmt=1&ads_player_height=&uid=1gnmqg5gu-qsvc-bfo-gaq3-3dgjgexshpe/hls/amagi_hls_data_rakutenAA-sportitalia-rakuten/CDN/1920x1080_4540800/chunklist.m3u8
+#EXTINF:-1 group-title="Sports",MASR QA
+https://shls-masr-ak.akamaized.net/out/v1/d5036cabf11e45bf9d0db410ca135c18/index.m3u8
+#EXTINF:-1 group-title="Sports",Susp Kiev Sport UA
+https://tva.in.ua/live/susp-sport.m3u8
+#EXTINF:-1 group-title="Sports",TVRI Sport 720p
+https://ott-balancer.tvri.go.id/live/eds/SportHD/hls/SportHD-avc1_1500000=10003-mp4a_96000=20002.m3u8
+#EXTINF:-1 group-title="Sports" backups="https://nbculocallive.akamaized.net/hls/live/2037499/puertorico/stream1/master.m3u8",Telemundo
+https://nbculocallive.akamaized.net/hls/live/2037499/puertorico/stream1/master_720.m3u8
+#EXTINF:-1 group-title="Sports",FOX NY
+https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00488-foxdigital-wnyw-lgus/playlist.m3u8
+#EXTINF:-1 group-title="Bangladesh",BTV
+https://owrcovcrpy.gpcdn.net/bpk-tv/1709/output/index.m3u8
+#EXTINF:-1 group-title="Bangladesh",T Sports
+http://luckonline.eu/live/y49sz6KMQs/6115263489/1142.ts
+#EXTINF:-1 group-title="Latin" backups="https://1nyaler.streamhostingcdn.top/stream/84/index.m3u8",TyC Sports ARG
+https://1nyaler.streamhostingcdn.top/stream/84/index.m3u8
+#EXTINF:-1 group-title="Latin" backups="https://1nyaler.streamhostingcdn.top/stream/30/index.m3u8",TNT Sports ARG
+https://1nyaler.streamhostingcdn.top/stream/30/index.m3u8
+#EXTINF:-1 group-title="Latin" backups="http://181.78.71.71:18000/play/a03p/index.m3u8|http://190.60.39.195:8000/play/a0ug/index.m3u8",Win Sports
+http://181.78.17.52:8000/play/a0pw/index.m3u8
+#EXTINF:-1 group-title="Latin" backups="https://estrellatv-roku.amagi.tv/playlist.m3u8",Azteca 7
+https://tv91.hostingnuclear.com:19360/xhunestv/xhunestv.m3u8
+#EXTINF:-1 group-title="Latin",CLARO SPORTS
+https://dai.google.com/linear/hls/event/_OKWx76jT7mivD6d-25QAw/master.m3u8`,
 
   worldcup: `#EXTM3U
 #EXTINF:-1 tvg-id="Somoy" tvg-name="Somoy" tvg-logo="https://i.postimg.cc/Y903JSq8/20260612-095648.jpg" group-title="FIFA",Somoy
