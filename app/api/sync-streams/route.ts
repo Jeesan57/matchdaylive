@@ -1,11 +1,13 @@
-// app/api/sync-streams/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy — only called at request time, not at build time
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('Supabase env vars not set');
+  return createClient(url, key);
+}
 
 interface StreamResult {
   name: string;
@@ -16,6 +18,7 @@ interface StreamResult {
 }
 
 export async function POST(req: NextRequest) {
+  const supabase = getSupabase();
   const { results, playlist } = (await req.json()) as {
     results: StreamResult[];
     playlist: string;
@@ -24,11 +27,10 @@ export async function POST(req: NextRequest) {
   let saved = 0;
   let removed = 0;
 
-  // Upsert working streams
   await Promise.all(
     results.map(async (r) => {
       if (r.status === 'ok') {
-        const { error } = await supabaseAdmin.from('streams').upsert(
+        const { error } = await supabase.from('streams').upsert(
           {
             name: r.name,
             url: r.url,
@@ -45,9 +47,8 @@ export async function POST(req: NextRequest) {
     })
   );
 
-  // Delete DB rows for this playlist whose URL is no longer in the playlist at all
-  const currentUrls = results.map(r => r.url);
-  const { data: dbRows } = await supabaseAdmin
+  const currentUrls = results.map((r) => r.url);
+  const { data: dbRows } = await supabase
     .from('streams')
     .select('url')
     .eq('playlist', playlist);
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     .filter((url: string) => !currentUrls.includes(url));
 
   if (urlsToDelete.length > 0) {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('streams')
       .delete()
       .in('url', urlsToDelete);
@@ -68,16 +69,13 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ saved, removed });
 }
 
-// ── DELETE: remove a single stream by URL ────────────────────────────────────
 export async function DELETE(req: NextRequest) {
+  const supabase = getSupabase();
   const { url } = (await req.json()) as { url: string };
 
   if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 });
 
-  const { error } = await supabaseAdmin
-    .from('streams')
-    .delete()
-    .eq('url', url);
+  const { error } = await supabase.from('streams').delete().eq('url', url);
 
   if (error) {
     console.error('delete error:', error.message);
