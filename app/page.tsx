@@ -5,12 +5,13 @@ import Hls from 'hls.js';
 import Link from 'next/link';
 import {
   Heart, Search, Tv, X, Signal, RefreshCw, ChevronRight,
-  Activity, AlertTriangle, Database, ChevronDown, Wifi, WifiOff, Loader2
+  Activity, AlertTriangle, Database, ChevronDown, Wifi, WifiOff,
+  Loader2, UploadCloud, CircleDot,
 } from 'lucide-react';
-import { PLAYLISTS, parseM3U, type Stream, type PlaylistKey } from '@/playlists';
+import { type Stream, type PlaylistKey } from '@/playlists';
+import ScoresPanel from '@/components/ScoresPanel';
 import { loadStreams, type DBStream } from '@/lib/supabase';
 
-// ─── HLS config ───────────────────────────────────────────────────────────────
 const HLS_CONFIG: Partial<Hls['config']> = {
   enableWorker: true,
   lowLatencyMode: true,
@@ -32,7 +33,6 @@ const HLS_CONFIG: Partial<Hls['config']> = {
 const STREAM_TIMEOUT_MS = 8000;
 
 type BufferState = 'loading' | 'playing' | 'error' | 'dash' | 'trying-backup';
-type StreamSource = 'supabase' | 'static';
 
 function dbToStream(db: DBStream): Stream {
   return {
@@ -46,8 +46,7 @@ function dbToStream(db: DBStream): Stream {
 export default function MatchdayLive() {
   const [activePlaylist, setActivePlaylist] = useState<PlaylistKey>('sports');
   const [streams, setStreams] = useState<Stream[]>([]);
-  const [streamSource, setStreamSource] = useState<StreamSource>('static');
-  const [loadingStreams, setLoadingStreams] = useState(true);
+  const [streamCount, setStreamCount] = useState<number | null>(null); // null = loading
   const [selectedStream, setSelectedStream] = useState<Stream | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -57,14 +56,14 @@ export default function MatchdayLive() {
   const [quality, setQuality] = useState<string>('');
   const [sourceIndex, setSourceIndex] = useState(0);
   const [groupOpen, setGroupOpen] = useState(false);
+  const [scoresOpen, setScoresOpen] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sourceIndexRef = useRef(0);
-  const activeStreamRef = useRef<Stream | null>(null);
 
-  // ── Persist favorites ────────────────────────────────────────────────────────
+  // ── Favorites ────────────────────────────────────────────────────────────────
   useEffect(() => {
     try { const s = localStorage.getItem('mdFavorites'); if (s) setFavorites(JSON.parse(s)); } catch { }
   }, []);
@@ -72,38 +71,30 @@ export default function MatchdayLive() {
     try { localStorage.setItem('mdFavorites', JSON.stringify(favorites)); } catch { }
   }, [favorites]);
 
-  // ── Load streams ─────────────────────────────────────────────────────────────
+  // ── Load from Supabase ────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    setLoadingStreams(true);
+    setStreamCount(null);
     setStreams([]);
     setSelectedStream(null);
     setSearchTerm('');
     setActiveGroup('All');
     setActiveTab('all');
+    setGroupOpen(false);
 
-    (async () => {
-      const dbRows = await loadStreams(activePlaylist);
+    loadStreams(activePlaylist).then(rows => {
       if (cancelled) return;
-      if (dbRows.length > 0) {
-        const parsed = dbRows.map(dbToStream);
-        setStreams(parsed);
-        setSelectedStream(parsed[0] ?? null);
-        setStreamSource('supabase');
-      } else {
-        const parsed = parseM3U(PLAYLISTS[activePlaylist]);
-        setStreams(parsed);
-        setSelectedStream(parsed[0] ?? null);
-        setStreamSource('static');
-      }
-      setLoadingStreams(false);
-    })();
+      const parsed = rows.map(dbToStream);
+      setStreams(parsed);
+      setStreamCount(parsed.length);
+      setSelectedStream(parsed[0] ?? null);
+    });
 
     return () => { cancelled = true; };
   }, [activePlaylist]);
 
   // ── URL helpers ──────────────────────────────────────────────────────────────
-  const getAllUrls = (stream: Stream): string[] => [stream.url, ...(stream.backups ?? [])];
+  const getAllUrls = (s: Stream) => [s.url, ...(s.backups ?? [])];
 
   // ── HLS player ───────────────────────────────────────────────────────────────
   const loadUrl = useCallback((url: string, stream: Stream, srcIdx: number) => {
@@ -164,7 +155,6 @@ export default function MatchdayLive() {
   }, []);
 
   const startPlayer = useCallback((stream: Stream) => {
-    activeStreamRef.current = stream;
     sourceIndexRef.current = 0;
     setSourceIndex(0);
     setBufferState('loading');
@@ -177,7 +167,9 @@ export default function MatchdayLive() {
     return startPlayer(selectedStream);
   }, [selectedStream, startPlayer]);
 
-  const handleRetry = useCallback(() => { if (selectedStream) startPlayer(selectedStream); }, [selectedStream, startPlayer]);
+  const handleRetry = useCallback(() => {
+    if (selectedStream) startPlayer(selectedStream);
+  }, [selectedStream, startPlayer]);
 
   const getVisibleStreams = useCallback(() => streams.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -230,18 +222,16 @@ export default function MatchdayLive() {
   const allUrls = selectedStream ? getAllUrls(selectedStream) : [];
   const totalSources = allUrls.length;
   const currentSourceNum = sourceIndex + 1;
+  const isLoading = streamCount === null;
+  const isEmpty = streamCount === 0;
 
   return (
     <div className="h-screen bg-[#07070f] text-white flex flex-col overflow-hidden">
 
       {/* ── Header ── */}
       <header className="h-12 shrink-0 border-b border-white/[0.06] flex items-center px-4 gap-2 bg-[#07070f]/95 backdrop-blur-md">
-
-        {/* Logo */}
         <div className="flex items-center gap-2 mr-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-sm shrink-0 shadow-lg shadow-emerald-900/40">
-            ⚽
-          </div>
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-sm shrink-0 shadow-lg shadow-emerald-900/40">⚽</div>
           <span className="font-bold tracking-tight text-sm">
             Matchday<span className="text-emerald-400">Live</span>
           </span>
@@ -251,21 +241,22 @@ export default function MatchdayLive() {
 
         {/* Playlist tabs */}
         <div className="flex gap-0.5 bg-white/[0.04] p-0.5 rounded-lg border border-white/[0.05]">
-          <button
-            onClick={() => setActivePlaylist('sports')}
-            className={`px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${activePlaylist === 'sports'
-              ? 'bg-white/10 text-white shadow-sm'
-              : 'text-white/35 hover:text-white/60 hover:bg-white/[0.04]'}`}
-          >⚽ Sports</button>
-          <button
-            onClick={() => setActivePlaylist('worldcup')}
-            className={`px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${activePlaylist === 'worldcup'
-              ? 'bg-amber-500/25 text-amber-300 shadow-sm'
-              : 'text-white/35 hover:text-white/60 hover:bg-white/[0.04]'}`}
-          >🏆 World Cup</button>
+          {(['sports', 'worldcup'] as PlaylistKey[]).map(pl => (
+            <button
+              key={pl}
+              onClick={() => setActivePlaylist(pl)}
+              className={`px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${activePlaylist === pl
+                  ? pl === 'worldcup'
+                    ? 'bg-amber-500/25 text-amber-300 shadow-sm'
+                    : 'bg-white/10 text-white shadow-sm'
+                  : 'text-white/35 hover:text-white/60 hover:bg-white/[0.04]'
+                }`}
+            >
+              {pl === 'sports' ? '⚽ Sports' : '🏆 World Cup'}
+            </button>
+          ))}
         </div>
 
-        {/* Health link */}
         <Link
           href="/health"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-all"
@@ -273,17 +264,29 @@ export default function MatchdayLive() {
           <Activity className="w-3 h-3" />Health
         </Link>
 
-        {/* Source pill */}
-        {!loadingStreams && (
-          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium border transition-colors ${streamSource === 'supabase'
-            ? 'bg-emerald-500/8 border-emerald-500/12 text-emerald-500/60'
-            : 'bg-white/[0.03] border-white/[0.05] text-white/20'}`}>
-            <Database className="w-2.5 h-2.5" />
-            {streamSource === 'supabase' ? `${streams.length} verified` : 'Static'}
-          </div>
-        )}
+        <button
+          onClick={() => setScoresOpen(v => !v)}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${scoresOpen
+              ? 'bg-emerald-500/10 border border-emerald-500/15 text-emerald-400/80'
+              : 'text-white/30 hover:text-white/60 hover:bg-white/[0.04]'
+            }`}
+        >
+          <CircleDot className="w-3 h-3" />Scores
+        </button>
 
-        {/* Keyboard hints */}
+        {/* DB status pill */}
+        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium border transition-all ${isLoading ? 'bg-white/[0.03] border-white/[0.05] text-white/20' :
+            isEmpty ? 'bg-amber-500/8 border-amber-500/12 text-amber-500/60' :
+              'bg-emerald-500/8 border-emerald-500/12 text-emerald-500/60'
+          }`}>
+          {isLoading
+            ? <><Loader2 className="w-2.5 h-2.5 animate-spin" />Loading…</>
+            : isEmpty
+              ? <><UploadCloud className="w-2.5 h-2.5" />No streams — run Health check</>
+              : <><Database className="w-2.5 h-2.5" />{streamCount} verified</>
+          }
+        </div>
+
         <div className="ml-auto hidden lg:flex items-center gap-3 text-[10px] text-white/15">
           {[['F', 'fullscreen'], ['Space', 'play/pause'], ['M', 'mute'], ['← →', 'channel']].map(([k, v]) => (
             <span key={k} className="flex items-center gap-1">
@@ -300,30 +303,26 @@ export default function MatchdayLive() {
         {/* ── Sidebar ── */}
         <aside className="w-[268px] shrink-0 border-r border-white/[0.05] flex flex-col bg-[#070710]" style={{ overflow: 'visible' }}>
 
-          {/* Tabs */}
+          {/* All / Favorites tabs */}
           <div className="px-3 pt-3 pb-2.5 flex gap-1 shrink-0">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'all'
-                ? 'bg-white/[0.08] text-white'
-                : 'text-white/25 hover:text-white/50 hover:bg-white/[0.03]'}`}
-            >
-              All
-              <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'all' ? 'bg-white/10 text-white/50' : 'bg-white/5 text-white/20'}`}>
-                {streams.length}
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('favorites')}
-              className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${activeTab === 'favorites'
-                ? 'bg-red-500/10 text-red-300'
-                : 'text-white/25 hover:text-white/50 hover:bg-white/[0.03]'}`}
-            >
-              ❤ Saved
-              <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'favorites' ? 'bg-red-500/15 text-red-400/70' : 'bg-white/5 text-white/20'}`}>
-                {favorites.length}
-              </span>
-            </button>
+            {(['all', 'favorites'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t)}
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${t === 'all'
+                    ? activeTab === 'all' ? 'bg-white/[0.08] text-white' : 'text-white/25 hover:text-white/50 hover:bg-white/[0.03]'
+                    : activeTab === 'favorites' ? 'bg-red-500/10 text-red-300' : 'text-white/25 hover:text-white/50 hover:bg-white/[0.03]'
+                  }`}
+              >
+                {t === 'all' ? 'All' : '❤ Saved'}
+                <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === t
+                    ? t === 'favorites' ? 'bg-red-500/15 text-red-400/70' : 'bg-white/10 text-white/50'
+                    : 'bg-white/5 text-white/20'
+                  }`}>
+                  {t === 'all' ? streams.length : favorites.length}
+                </span>
+              </button>
+            ))}
           </div>
 
           {/* Search */}
@@ -345,7 +344,7 @@ export default function MatchdayLive() {
             </div>
           </div>
 
-          {/* Group filter dropdown */}
+          {/* Group dropdown */}
           {groups.length > 2 && (
             <div className="px-3 pb-2 shrink-0 relative z-10">
               <button
@@ -365,9 +364,8 @@ export default function MatchdayLive() {
                       <button
                         key={g}
                         onClick={() => { setActiveGroup(g); setGroupOpen(false); }}
-                        className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors flex items-center justify-between ${activeGroup === g
-                          ? 'bg-emerald-600/15 text-emerald-300'
-                          : 'text-white/40 hover:bg-white/[0.05] hover:text-white/70'}`}
+                        className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors flex items-center justify-between ${activeGroup === g ? 'bg-emerald-600/15 text-emerald-300' : 'text-white/40 hover:bg-white/[0.05] hover:text-white/70'
+                          }`}
                       >
                         {g}
                         {activeGroup === g && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
@@ -379,8 +377,7 @@ export default function MatchdayLive() {
             </div>
           )}
 
-          {/* Channel count */}
-          {!loadingStreams && visible.length > 0 && (
+          {!isLoading && visible.length > 0 && (
             <div className="px-4 pb-1.5 shrink-0">
               <p className="text-[10px] text-white/15">{visible.length} channel{visible.length !== 1 ? 's' : ''}</p>
             </div>
@@ -388,12 +385,38 @@ export default function MatchdayLive() {
 
           {/* Channel list */}
           <div className="flex-1 overflow-y-auto px-2 pb-3 sidebar-scroll">
-            {loadingStreams ? (
+
+            {/* Loading skeleton */}
+            {isLoading && (
               <div className="flex flex-col items-center justify-center h-40 gap-2.5 text-white/20">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <p className="text-[11px]">Loading streams…</p>
               </div>
-            ) : visible.length === 0 ? (
+            )}
+
+            {/* Empty — no streams synced yet */}
+            {!isLoading && isEmpty && (
+              <div className="flex flex-col items-center justify-center h-52 gap-3 px-4 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center">
+                  <UploadCloud className="w-5 h-5 text-white/15" />
+                </div>
+                <div>
+                  <p className="text-[11px] text-white/30 font-medium">No streams yet</p>
+                  <p className="text-[10px] text-white/15 mt-1 leading-relaxed">
+                    Upload an M3U on the<br />Health page to get started
+                  </p>
+                </div>
+                <Link
+                  href="/health"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-emerald-400 bg-emerald-600/12 border border-emerald-500/20 hover:bg-emerald-600/20 transition-colors"
+                >
+                  <Activity className="w-3 h-3" />Go to Health page
+                </Link>
+              </div>
+            )}
+
+            {/* No results after filter */}
+            {!isLoading && !isEmpty && visible.length === 0 && (
               <div className="flex flex-col items-center justify-center h-40 gap-2 text-white/20">
                 <Tv className="w-5 h-5" />
                 <p className="text-[11px]">No channels found</p>
@@ -403,78 +426,87 @@ export default function MatchdayLive() {
                   </button>
                 )}
               </div>
-            ) : (
-              visible.map(stream => {
-                const isActive = selectedStream?.url === stream.url;
-                const isFavItem = favorites.includes(stream.url);
-                const backupCount = stream.backups?.length ?? 0;
-                return (
-                  <div
-                    key={stream.url}
-                    onClick={() => setSelectedStream(stream)}
-                    className={`group flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer transition-all mb-0.5 ${isActive
+            )}
+
+            {/* Channel rows */}
+            {!isLoading && visible.map(stream => {
+              const isActive = selectedStream?.url === stream.url;
+              const isFavItem = favorites.includes(stream.url);
+              const backupCount = stream.backups?.length ?? 0;
+              return (
+                <div
+                  key={stream.url}
+                  onClick={() => setSelectedStream(stream)}
+                  className={`group flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer transition-all mb-0.5 ${isActive
                       ? 'bg-emerald-600/12 ring-1 ring-emerald-500/15'
-                      : 'hover:bg-white/[0.03] ring-1 ring-transparent hover:ring-white/[0.04]'}`}
-                  >
-                    <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center overflow-hidden transition-colors ${isActive ? 'bg-emerald-900/30' : 'bg-white/[0.04]'}`}>
-                      {stream.tvgLogo
-                        ? <img src={stream.tvgLogo} alt="" className="w-full h-full object-contain p-0.5" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                        : <Tv className="w-3.5 h-3.5 text-white/15" />}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-[11px] font-semibold truncate leading-tight ${isActive ? 'text-emerald-300' : 'text-white/65 group-hover:text-white/80'}`}>
-                        {stream.name}
-                      </p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        {stream.group && <p className="text-[9px] text-white/20 truncate">{stream.group}</p>}
-                        {backupCount > 0 && (
-                          <span className="text-[8px] bg-white/[0.06] text-white/20 px-1 py-0.5 rounded shrink-0">+{backupCount}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isActive && (
-                        <Signal className={`w-3 h-3 ${bufferState === 'playing' ? 'text-emerald-400' : 'text-white/20'}`} />
-                      )}
-                      <button
-                        onClick={e => toggleFavorite(stream.url, e)}
-                        className={`p-0.5 rounded transition-colors ${isFavItem
-                          ? 'text-red-400'
-                          : 'text-transparent group-hover:text-white/15 hover:!text-red-400'}`}
-                      >
-                        <Heart className="w-3 h-3" fill={isFavItem ? 'currentColor' : 'none'} />
-                      </button>
+                      : 'hover:bg-white/[0.03] ring-1 ring-transparent hover:ring-white/[0.04]'
+                    }`}
+                >
+                  <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center overflow-hidden transition-colors ${isActive ? 'bg-emerald-900/30' : 'bg-white/[0.04]'}`}>
+                    {stream.tvgLogo
+                      ? <img src={stream.tvgLogo} alt="" className="w-full h-full object-contain p-0.5" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      : <Tv className="w-3.5 h-3.5 text-white/15" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[11px] font-semibold truncate leading-tight ${isActive ? 'text-emerald-300' : 'text-white/65 group-hover:text-white/80'}`}>
+                      {stream.name}
+                    </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {stream.group && <p className="text-[9px] text-white/20 truncate">{stream.group}</p>}
+                      {backupCount > 0 && <span className="text-[8px] bg-white/[0.06] text-white/20 px-1 py-0.5 rounded shrink-0">+{backupCount}</span>}
                     </div>
                   </div>
-                );
-              })
-            )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isActive && <Signal className={`w-3 h-3 ${bufferState === 'playing' ? 'text-emerald-400' : 'text-white/20'}`} />}
+                    <button
+                      onClick={e => toggleFavorite(stream.url, e)}
+                      className={`p-0.5 rounded transition-colors ${isFavItem ? 'text-red-400' : 'text-transparent group-hover:text-white/15 hover:!text-red-400'}`}
+                    >
+                      <Heart className="w-3 h-3" fill={isFavItem ? 'currentColor' : 'none'} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </aside>
 
-        {/* ── Player area ── */}
+        {/* ── Player ── */}
         <main className="flex-1 flex flex-col p-3 gap-3 overflow-hidden min-w-0 bg-[#050509]">
-
-          {/* Video */}
           <div className="relative rounded-xl overflow-hidden bg-black flex-1 ring-1 ring-white/[0.05]">
             <video ref={videoRef} controls autoPlay playsInline className="w-full h-full" />
 
-            {/* Loading */}
-            {bufferState === 'loading' && (
+            {bufferState === 'loading' && selectedStream && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm">
                 <div className="w-10 h-10 rounded-full border border-emerald-500/20 flex items-center justify-center">
                   <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-white/50 font-medium">Connecting…</p>
-                  <p className="text-[10px] text-white/20 mt-0.5">{selectedStream?.name}</p>
+                  <p className="text-[10px] text-white/20 mt-0.5">{selectedStream.name}</p>
                 </div>
               </div>
             )}
 
-            {/* Trying backup */}
+            {/* No-streams placeholder in player area */}
+            {!isLoading && isEmpty && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80">
+                <div className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+                  <UploadCloud className="w-7 h-7 text-white/15" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-white/35 font-medium">No verified streams</p>
+                  <p className="text-xs text-white/20 mt-1">Upload an M3U on the Health page and run a check</p>
+                </div>
+                <Link
+                  href="/health"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-emerald-400 bg-emerald-600/12 border border-emerald-500/20 hover:bg-emerald-600/20 transition-colors"
+                >
+                  <Activity className="w-4 h-4" />Open Health Page
+                </Link>
+              </div>
+            )}
+
             {bufferState === 'trying-backup' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm">
                 <div className="w-10 h-10 rounded-full border border-amber-500/20 flex items-center justify-center">
@@ -487,7 +519,6 @@ export default function MatchdayLive() {
               </div>
             )}
 
-            {/* Error */}
             {(bufferState === 'error' || bufferState === 'dash') && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/75 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
@@ -498,10 +529,8 @@ export default function MatchdayLive() {
                     {bufferState === 'dash' ? 'Unsupported format' : 'Stream unavailable'}
                   </p>
                   <p className="text-[11px] text-white/25 mt-1">
-                    {bufferState === 'error' && totalSources > 1
-                      ? `Tried all ${totalSources} sources`
-                      : bufferState === 'dash' ? 'DASH streams are not supported'
-                        : 'Try another channel'}
+                    {bufferState === 'error' && totalSources > 1 ? `Tried all ${totalSources} sources` :
+                      bufferState === 'dash' ? 'DASH streams are not supported' : 'Try another channel'}
                   </p>
                 </div>
                 {bufferState === 'error' && (
@@ -523,7 +552,6 @@ export default function MatchdayLive() {
               </div>
             )}
 
-            {/* Live badge */}
             {bufferState === 'playing' && (
               <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/55 backdrop-blur-md rounded-lg px-2 py-1 pointer-events-none ring-1 ring-white/[0.06]">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -531,14 +559,12 @@ export default function MatchdayLive() {
               </div>
             )}
 
-            {/* Quality badge */}
             {bufferState === 'playing' && quality && (
               <div className="absolute top-3 right-3 bg-black/55 backdrop-blur-md rounded-lg px-2 py-1 pointer-events-none ring-1 ring-white/[0.06]">
                 <span className="text-[9px] font-bold text-white/45 tracking-wide">{quality}</span>
               </div>
             )}
 
-            {/* Backup source indicator */}
             {bufferState === 'playing' && sourceIndex > 0 && (
               <div className="absolute bottom-16 left-3 flex items-center gap-1.5 bg-amber-950/60 backdrop-blur-md border border-amber-500/15 rounded-lg px-2.5 py-1 pointer-events-none">
                 <AlertTriangle className="w-3 h-3 text-amber-400/70" />
@@ -547,7 +573,7 @@ export default function MatchdayLive() {
             )}
           </div>
 
-          {/* ── Now playing bar ── */}
+          {/* Now playing bar */}
           {selectedStream && (
             <div className="shrink-0 flex items-center gap-3 bg-white/[0.025] border border-white/[0.05] rounded-xl px-3.5 py-2.5">
               <div className="w-9 h-9 shrink-0 rounded-lg bg-white/[0.04] flex items-center justify-center overflow-hidden">
@@ -555,7 +581,6 @@ export default function MatchdayLive() {
                   ? <img src={selectedStream.tvgLogo} alt="" className="w-full h-full object-contain p-0.5" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   : <Tv className="w-4 h-4 text-white/15" />}
               </div>
-
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-semibold text-sm truncate text-white/85">{selectedStream.name}</p>
@@ -568,26 +593,30 @@ export default function MatchdayLive() {
                 <div className="flex items-center gap-2 mt-0.5">
                   {selectedStream.group && <p className="text-[10px] text-white/25">{selectedStream.group}</p>}
                   {totalSources > 1 && <p className="text-[10px] text-white/15">· {totalSources} sources</p>}
-                  {streamSource === 'supabase' && (
-                    <span className="text-[9px] text-emerald-500/35 flex items-center gap-0.5">
-                      <Database className="w-2 h-2" />verified
-                    </span>
-                  )}
+                  <span className="text-[9px] text-emerald-500/35 flex items-center gap-0.5">
+                    <Database className="w-2 h-2" />verified
+                  </span>
                 </div>
               </div>
-
               <button
                 onClick={() => toggleFavorite(selectedStream.url)}
-                title={isFav ? 'Remove from saved' : 'Save channel'}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0 ${isFav
-                  ? 'bg-red-500/12 border border-red-500/20 text-red-400 hover:bg-red-500/20'
-                  : 'bg-white/[0.03] border border-white/[0.06] text-white/20 hover:text-white/50 hover:bg-white/[0.06]'}`}
+                    ? 'bg-red-500/12 border border-red-500/20 text-red-400 hover:bg-red-500/20'
+                    : 'bg-white/[0.03] border border-white/[0.06] text-white/20 hover:text-white/50 hover:bg-white/[0.06]'
+                  }`}
               >
                 <Heart className="w-3.5 h-3.5" fill={isFav ? 'currentColor' : 'none'} />
               </button>
             </div>
           )}
         </main>
+
+        {/* ── Scores sidebar ── */}
+        {scoresOpen && (
+          <aside className="w-[280px] shrink-0 border-l border-white/[0.05] overflow-hidden flex flex-col">
+            <ScoresPanel />
+          </aside>
+        )}
       </div>
 
       <style jsx global>{`
