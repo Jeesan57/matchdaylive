@@ -545,7 +545,7 @@ export default function MatchdayLive() {
                       onClick={handleNextChannel}
                       className="flex items-center gap-1.5 text-[11px] font-semibold text-white/35 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 hover:bg-white/[0.08] transition-colors"
                     >
-                      Next<ChevronRight className="w-3 h-3" />
+                      Next <ChevronRight className="w-3 h-3" />
                     </button>
                   </div>
                 )}
