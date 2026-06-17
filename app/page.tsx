@@ -9,7 +9,6 @@ import {
   Loader2, UploadCloud, CircleDot,
 } from 'lucide-react';
 import { type Stream, type PlaylistKey } from '@/playlists';
-import ScoresPanel from '@/components/ScoresPanel';
 import { loadStreams, type DBStream } from '@/lib/supabase';
 
 const HLS_CONFIG: Partial<Hls['config']> = {
@@ -611,12 +610,7 @@ export default function MatchdayLive() {
           )}
         </main>
 
-        {/* ── Scores sidebar ── */}
-        {scoresOpen && (
-          <aside className="w-[280px] shrink-0 border-l border-white/[0.05] overflow-hidden flex flex-col">
-            <ScoresPanel />
-          </aside>
-        )}
+     
       </div>
 
       <style jsx global>{`
